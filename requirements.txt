@@ -1,0 +1,8 @@
+pandas
+openpyxl
+requests
+selenium
+webdriver-manager
+python-dotenv
+behave
+rich
