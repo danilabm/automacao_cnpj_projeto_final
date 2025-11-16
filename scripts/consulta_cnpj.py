@@ -4,6 +4,7 @@ import pandas as pd
 import argparse
 import requests
 from dotenv import load_dotenv
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -44,7 +45,7 @@ def obter_dados_api(cnpj, api_mode, token=None, max_tentativas=10, tempo_base=10
             elif r.status_code == 429:
                 print(f"⚠️ API {api_mode} retornou 429 (muitas requisições). Tentativa {tentativa}/{max_tentativas}. Aguardando {tempo_espera}s...")
                 time.sleep(tempo_espera)
-                tempo_espera *= 2  # dobra o tempo de espera
+                tempo_espera *= 2
                 continue
             else:
                 print(f"⚠️ Erro {r.status_code} na API {api_mode} ({cnpj})")
@@ -182,6 +183,13 @@ def main():
         try:
             registro = processar_dados_api(cnpj, dados)
             resultados.append(registro)
+
+            # 🔥 Salvar progresso a cada 20 resultados bem-sucedidos
+            if len(resultados) % 20 == 0:
+                df_checkpoint = pd.DataFrame(resultados)
+                df_checkpoint.to_excel("resultado_parcial.xlsx", index=False)
+                print("💾 Arquivo parcial salvo: resultado_parcial.xlsx")
+
         except Exception as e:
             print(f"❌ Erro ao processar {cnpj}: {e}")
             erros.append(cnpj)
@@ -200,15 +208,18 @@ def main():
                     driver = iniciar_chrome()
                     if driver:
                         mostrar_no_chrome(driver, cnpj)
+
             dados = obter_dados_api(cnpj, api_principal, token, max_tentativas=10, tempo_base=10)
             if not dados:
                 dados = obter_dados_api(cnpj, api_fallback, token, max_tentativas=10, tempo_base=10)
+
             if dados:
                 registro = processar_dados_api(cnpj, dados)
                 resultados.append(registro)
                 print(f"✅ Sucesso na segunda tentativa: {cnpj}")
             else:
                 print(f"❌ Falha definitiva para {cnpj}")
+
             time.sleep(tempo_erro)
 
     if driver:
@@ -217,7 +228,7 @@ def main():
         except Exception:
             pass
 
-    # Salva resultado mesmo se houver erros
+    # Salva resultado final
     if resultados:
         df_saida = pd.DataFrame(resultados)
         df_saida.to_excel(args.output, index=False)
